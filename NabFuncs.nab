@@ -1,0 +1,166 @@
+//NAB FUNCTIONS
+#include "NabFuncs.h"
+
+int getNewConf(float  oldGh_xyz[0],     /* input coordinates of old ghost */
+               float    newGh_xyz[0],   /* output of getNewConf, new ghost coordinates written into this */
+               molecule strand, string strn, string atomGroup){        /* molecule information for one strand */
+
+    int			j,n;
+    float       Phi, Psi;  
+    atom		ai;
+    point       org, xPhi, xPsi;
+    //string		atomGroup, strn, stri;
+    matrix      mat1;
+
+    setmol_from_xyz(strand, NULL, oldGh_xyz);
+  
+    rseed();
+    Phi = 360 * rand2();
+    Psi = 360 * rand2();   
+    n=floor(6 * rand2() + 1);
+
+    strn = sprintf("%d", n);
+
+
+    for (ai in strand) {
+        if (ai.fullname == "1:" + strn + ":N")
+            xPhi = ai.pos;
+        if (ai.fullname == "1:" + strn + ":C")
+            xPsi = ai.pos;
+        if (ai.fullname == "1:" + strn + ":CA")
+            org = ai.pos;
+    }
+   
+    setframep( 1, strand,
+               org,         //origin
+               org, xPhi,   //x axis
+               org, xPsi);  //y axis
+    alignframe(strand, NULL);
+        
+    if (n != 1) {
+        mat1 = newtransform(0, 0, 0, Phi, 0, 0);    
+        atomGroup =  "1:1";
+        for (j=2; j<n; j++)
+            atomGroup += "," + sprintf("%d",j);
+        atomGroup += ":";
+        transformmol(mat1,strand, atomGroup);
+        
+        atomGroup = "1:" + strn + ":H";
+        transformmol(mat1,strand, atomGroup);
+    }
+    for (ai in strand) {
+        if (ai.fullname == "1:" + strn + ":N")
+            xPhi = ai.pos;
+        if (ai.fullname == "1:" + strn + ":C")
+            xPsi = ai.pos;
+        if (ai.fullname == "1:" + strn + ":CA")
+            org = ai.pos;
+    }
+    setframep( 1, strand,
+               org,         //origin
+               org, xPsi,   //x axis
+               org, xPhi);  //y axis
+    alignframe(strand, NULL);
+    if (n != 6) {
+        mat1 = newtransform(0, 0, 0, Psi, 0, 0);  
+        atomGroup = "1:" + strn + ":C,O";
+        transformmol(mat1,strand,atomGroup);
+        atomGroup = "1:";
+        for (j=n+1; j<6; j++)
+            atomGroup += sprintf("%d",j) + ",";
+        atomGroup += "6:";
+        transformmol(mat1,strand, atomGroup);
+    }
+    setxyz_from_mol(strand, NULL, newGh_xyz);
+    return 0;
+};
+
+int gtNewGhost(float molc_xyz[0], int nPeps, int atmsPerPep, molecule strand, float strand_xyz[0], molecule temp, float temp_xyz[0], float singleGh_xyz[0], float ghost_xyz[0]){
+    int     i1, j1;
+    atom    ai;
+    string  str;
+    point   p1, p2, pN, pC, pM, vNC, rotationAxis;
+    matrix  mat1;
+    float   rotAng;
+    for (j1 = 1; j1 <= 3*atmsPerPep; j1++)
+        temp_xyz[j1] = singleGh_xyz[j1];
+    setmol_from_xyz(temp, NULL, temp_xyz);         
+    /* loop over n peptides */
+    for (i1 = 1; i1 <= nPeps; i1++){
+        /* expensive, pointless, copy of coordinates for this peptide into a workspace */
+        for (j1 = 1; j1 <= 3*atmsPerPep; j1++){
+            strand_xyz[j1] = molc_xyz[3*(i1-1)*atmsPerPep+j1];
+        }
+        setmol_from_xyz(strand, NULL, strand_xyz);   
+		superimpose(temp,"::C,CA,CB,N,O",strand,"::C,CA,CB,N,O");
+
+        for (ai in temp){
+            if (ai.fullname == "1:1:N"){
+                pN = ai.pos;
+            }
+            else{
+                if (ai.fullname == "1:6:C"){
+                    pC = ai.pos;
+                }
+            }
+        }
+        pM  = 0.5*(pN+pC);
+        vNC = pC-pN;
+        rotAng = -atan(vNC.y/sqrt((vNC.x*vNC.x)+(vNC.z*vNC.z)));
+        //project vNC into the x-z plane and then rotate +90 degrees.
+        rotationAxis.x = -vNC.z;
+        rotationAxis.y =    0.0;
+        rotationAxis.z =  vNC.x;
+        if( rotationAxis@rotationAxis < 0.000001 ){
+            rotationAxis.x = 1.0;
+        }
+        mat1 = rot4p(pM, pM+rotationAxis, rotAng); 
+        transformmol(mat1,temp,"::");
+        setxyz_from_mol(temp,NULL,temp_xyz);
+        for (j1 = 1; j1 <= 3*atmsPerPep; j1++)
+            ghost_xyz[3*(i1-1)*atmsPerPep+j1] = temp_xyz[j1];         
+    }
+	return 0;
+};
+//for a given molecule "molc", with "nPeps" strannds, this function put the strands in the array "stran" and the geometrical center of them in "mgc[]".
+int CreateStrands(molecule molc, int nPeps, molecule stran[0], point mgc[0]){
+    molecule    mlc; 
+    atom        ai;   
+    string      stri;
+    point       p;
+	int         i1;
+//------------------------------------------------------------------- 	
+    for(i1=1; i1<=nPeps; i1++){
+    //------Create strands
+	    stran[i1]=newmolecule();
+	    addstrand(stran[i1], "1");
+	    stri=sprintf("%d",i1);
+	    mergestr(stran[i1], "1", "first", molc, stri, "last");
+    //------
+	    p.x=p.y=p.z=0;
+    //------Get geometric centre
+        mlc=stran[i1];
+    	for(ai in mlc)
+	    	p+=ai.pos;
+	    p/=mlc.natoms;
+	    mgc[i1]=p;
+    //------
+    }
+
+    return 0;
+};
+
+//for an array of strands,"stran[]", such as peptides, and number of them, "nPeps", This function puts the molcule consists of these strands in "molc".
+int  MergeStrands(molecule stran[0], int nPeps, molecule molc){
+
+	string      stri;
+	int         i1;
+//------------------------------------------------------------------- 	
+	for(i1=1; i1<=nPeps; i1++){
+		stri=sprintf("%d",i1);
+		addstrand(molc, stri);
+		mergestr(molc, stri, "first", stran[i1], "1", "last");
+	}
+
+	return 0;
+};
