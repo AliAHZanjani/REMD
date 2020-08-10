@@ -3,7 +3,7 @@
 //-------------------------------------------------------------
 //definition of variables
 float		m_xyz[dynamic], f_xyz[dynamic], v[dynamic];
-float		fret, dummy[2];
+float		fret, dummy[2], test_ene;
 float		abc[3], albega[3], lambda, boxl, kwall, ktotal;
 int			i, j, nofstrands, nofatoms, atomofstrand, status;
 int			IsHeavy[dynamic];
@@ -11,23 +11,33 @@ molecule	m1, strandm[dynamic], strand1;
 atom		ai;
 point		mlgeocenter[dynamic], vabc[3], COM, COMV;
 string		stri, pepName;
-string		inputArg[hashed];
+string		inputArg[hashed], inLine;
 file		tfout;
 int			outrst_fieldCount;
 int			prsteps, simTime;
 file        rstfout, lseqfout,lseqAdfout, rstfin;
 
+
+//* not sure how to init string constants in nab, so just use sprintf */
+string      usage;
+usage    =    sprintf("%s\n%s\n%s\n\n", "peptide1  [-l lambda] [-q 1]  [-boxR Radius] [-kWall wallConstant]",\
+           "    [-t time(ns)] [-prStp printstep(ps)] -iniConf file.rst7 -iniTop file -Traj file.trj",\
+           "    -outf out.log -Pot file.dat -lseq lambdaSeq.dat -lseqAd lambdaSeqAd.dat -gh ghost.pdb -sy system.pdb");
+
 //===================================================================
-if (argc == 1){
-    printf ("\n\nusage: peptide1  [-l lambda] [-q] [1]  [-boxR Radius] [-kWall wallConstant] [-t time(ns)] [-prStp printstep(ps)] -iniConf file.rst7 -iniTop file -Traj file.trj -Pot file.dat -lseq lambdaSeq.dat -lseqAd lambdaSeqAd.dat -gh ghost.pdb\n\n");
+if (argc <= 1){
+    printf ("usage: %s", usage);
     exit(1);
 }
 else
-    for (i = 1; i < argc; i++)
+    for (i = 1; i < argc; i+=2)
         inputArg[argv[i+1]] = argv[i+2];
 
-if ((!inputArg["-iniConf"] || !inputArg["-iniTop"] || !inputArg["-Traj"] || !inputArg["-Pot"] || !inputArg["-lseq"] || !inputArg["-lseqAd"] || !inputArg["-gh"]) && argc != 1){
-    printf ("\n\nPlease specify initial configuration and topology files name\nusage: peptide1 [-l lambda] [-q] [1] [-boxR Radius] [-kWall wallConstant] [-t time(ns)] [-prStp printstep(ps)] -iniConf file.rst -iniTop file -Traj file.trj -Pot file.dat -lseq lambdaSeq.dat -gh ghost.pdb\n\n");
+if ((!inputArg["-iniConf"] || !inputArg["-iniTop"] || !inputArg["-Traj"] || !inputArg["-Pot"] || !inputArg["-lseq"] || !inputArg["-lseqAd"] || !inputArg["-gh"]) && \
+       argc != 1){
+    printf ("\n\nargc: %i\n Please specify initial configuration and topology files name\n %s \n arg pairs:\n", argc, usage);
+    for (i = 1; i < argc; i+=2)
+        printf("   %s --> %s\n", argv[i+1], argv[i+2]);
     exit(1);
 }
 
@@ -41,6 +51,15 @@ if (inputArg["-q"]){
         printf("having problem setting nabout to null\n");
         exit (1);
     }
+}
+
+
+if (inputArg["-sy"]){
+    pepName = inputArg["-sy"];
+    m1      = getpdb(pepName);
+}else{
+    printf("Error! Need a template pdb file of the N peptides, argument '-sy filename'\n");
+    exit ( 1 );
 }
 
 if (inputArg["-boxR"])
@@ -63,9 +82,9 @@ if (inputArg["-prStp"])
 else
     prsteps = 100;
 //===================================================================
-nabout = safe_fopen(inputArg["-outf"], "a"); //NAB output file             
+nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file             
 
-lseqfout = safe_fopen(inputArg["-lseq"], "a");
+lseqfout   = safe_fopen(inputArg["-lseq"], "a");
 fprintf(lseqfout, "%lf\n", lambda);
 fclose(lseqfout);
 
@@ -74,22 +93,26 @@ fprintf(lseqAdfout, "%lf\n", lambda);
 fclose(lseqAdfout);
 
 rseed();
-pepName = "/work/users/ahakamizanjani/Jobs/IL7kinematics=/Pool64/peptides.pdb.000001";
 
-m1 = getpdb(pepName);
-stri = inputArg["-gh"];
+stri    = inputArg["-gh"];
 strand1 = getpdb(stri);
 
 //-------------------------------------------------------------------
 nofstrands   = m1.nstrands;
 nofatoms     = m1.natoms;
 atomofstrand = nofatoms/nofstrands;
+printf("ref system has %i strands of %i atoms each\n", nofstrands, atomofstrand);
+
 //-------------------------------------------------------------------
 rstfin = safe_fopen(inputArg["-iniConf"], "r");
+inLine = getline( rstfin );
+printf("read header line in input restart:\n''%s''\n", inLine );
 fscanf(rstfin, "%d\n", nofatoms);
+printf("start config has %i atoms, should be %i x %i\n", nofatoms, nofstrands, atomofstrand);
 
 allocate m_xyz[3*nofatoms];
 
+//--read the input, ascii-formatted restart.
 outrst_fieldCount = 0;
 for(j=1; j<=nofatoms; j++){
     fscanf(rstfin, "%lf", m_xyz[3*j-2]);
@@ -107,6 +130,8 @@ for(j=1; j<=nofatoms; j++){
    	if(outrst_fieldCount % 6 == 0){
        	fscanf(rstfin, "\n");
    	}
+    if( j < 3 )
+       printf("atom %i: %lf %lf %lf\n", j, m_xyz[3*j-2], m_xyz[3*j-1], m_xyz[3*j-0]);
 }
 if(outrst_fieldCount % 6 != 0){
 	fscanf(rstfin, "\n");
@@ -137,23 +162,35 @@ allocate v[3*nofatoms];
 allocate IsHeavy[3*nofatoms]; 
 
 for (ai in m1){
-    if(ai.atomname !~"H")
+    if(ai.atomname !~"H" || ai.atomname =~"CH")
         IsHeavy[3*ai.tatomnum] = IsHeavy[3*ai.tatomnum-1] = IsHeavy[3*ai.tatomnum-2]=1;
     else
         IsHeavy[3*ai.tatomnum] = IsHeavy[3*ai.tatomnum-1] = IsHeavy[3*ai.tatomnum-2]=0;
 }
 
 setxyz_from_mol(m1,NULL,m_xyz);
-status = init_mymme(m_xyz, strand1, nofstrands, nofatoms, atomofstrand, lambda, boxl, kwall, IsHeavy, prsteps, inputArg["-Traj"], inputArg["-Pot"] );
+status = init_mymme(m_xyz, strand1, nofstrands, nofatoms, atomofstrand, lambda, boxl, kwall, IsHeavy, prsteps, \
+                       inputArg["-Traj"], inputArg["-Pot"] );
+
 mm_options("gb=5, gbsa=1, ntpr=1000, ntpr_md=1000, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
+
+//mm_options("gb=8, gbsa=1, ntpr=1, ntpr_md=1, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
 mme_init(m1, NULL,"::ZZZ", dummy, NULL);
+
+///try a single-point energy evaluation, just to validate the inputs.
+test_ene = mme(m_xyz, f_xyz, 1);
+printf("Basic test of input structure, ene is: %e\n", test_ene);
+test_ene =my_mme(m_xyz, f_xyz, 1);
+printf("Subject to restraints, test ene is: %e\n", test_ene);
+
+  
 md(3*nofatoms, simTime, m_xyz, f_xyz, v, my_mme);      
 
 rstfout = safe_fopen(inputArg["-iniConf"], "w");
 
 outrst_fieldCount = 0;
 
-fprintf(rstfout, "%d\n", nofatoms);
+fprintf(rstfout, "remd restart\n%d\n", nofatoms);
 
 for(j=1; j<=nofatoms; j++){
 			fprintf(rstfout, "%12.7lf", m_xyz[3*j-2]);
