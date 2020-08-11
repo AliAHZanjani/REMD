@@ -1,10 +1,10 @@
 #!/bin/bash -l 
 
-##tidy up previous tesst runs
+##tidy up previous test runs
 rm -f out.log pot.dat test.trj
-cp PTIYSLLL.rst.bak PTIYSLLL.rst
+cp FTIYSLLL.rst.bak FTIYSLLL.rst
 
 ##do the run.
-../peptide1 -t 0.01 -prStp 1 -iniConf PTIYSLLL.rst -iniTop PTIYSLLL_mb3.top \
+../peptide1 -t 0.01 -prStp 1 -iniConf FTIYSLLL.rst -iniTop FTIYSLLL_mb3.top \
 	    -Traj test.trj -outf out.log -Pot pot.dat -lseq testLseq.dat -lseqAd testLseq_ad.dat \
-	    -gh PTIYSLLL.pdb -sy PTIYSLLL.pdb
+	    -gh FTIYSLLL.pdb -sy FTIYSLLL.pdb

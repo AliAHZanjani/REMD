@@ -19,11 +19,11 @@ EOF
 
 
 
-$sander -O -c PTIYSLLL.crd -p PTIYSLLL_mb3.top -x sander_test.trj -o sander.out -i sander_test.in -r PTIYSLLL.rstnc
+$sander -O -c FTIYSLLL.crd -p FTIYSLLL_mb3.top -x sander_test.trj -o sander.out -i sander_test.in -r FTIYSLLL.rstnc
 
-$AMBERHOME/bin/cpptraj PTIYSLLL_mb3.top << EOF
-trajin PTIYSLLL.rstnc
-trajout PTIYSLLL.rst restart 
+$AMBERHOME/bin/cpptraj FTIYSLLL_mb3.top << EOF
+trajin FTIYSLLL.rstnc
+trajout FTIYSLLL.rst restart 
 go
 EOF
 
