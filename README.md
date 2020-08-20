@@ -64,7 +64,7 @@ peptide1  [-l lambda] [-q] [1]  [-boxR Radius] [-kWall wallConstant] [-t time(ns
 
 ## Inputs
 
-Variables which might need to be changed for different systems are set to standard values in pep.py, then passes as arguments to peptide1.  Some effort was expended in finding a good set of lambda values; boundary conditions (size of the spherical confinement) however is a fairly arbitrary choice.  Work out the effective concentration that you want to simulate at, but beware that at low concentrations there is no acceleration of diffusion-driven sampling, so the code will not perform especially fast.
+Variables which might need to be changed for different systems are set to standard values in pep.py, then passed as arguments to peptide1.  Some effort was expended in finding a good set of lambda values; boundary conditions (size of the spherical confinement) however is a fairly arbitrary choice.  Work out the effective concentration that you want to simulate at, but beware that there is no acceleration of diffusion-driven sampling, so at low concentrations the code will spend a lot of time waiting for peptides to bump into eachother.
 
 ### Restraint strength parameter lambda
 
