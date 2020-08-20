@@ -69,9 +69,8 @@ Variables which might need to be changed for different systems are set to standa
 ### Restraint strength parameter lambda
 
 [-l lambda]
-[-lseq lambdaseq.dat]
 
-Either apply a single lambda, or load a set of lambdas from lambdaSeq.dat filename.
+Lambda determines the restraint strength for the given replica.  It can be negative, in which case this replica is pushed *away* from extended and oriented conformations, probably therefore increasing the alpha-helical content.  The use of a few negative lambdas is intended to allow the system to explore beyond the first most kinetically available amyloid-like configuration by having some replicas be permanently disordered.
 
 ### Boundary conditions
 
