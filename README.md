@@ -33,6 +33,7 @@ python $REMD_PATH/pep.py n_replicas=$YOUR_N_REPLICAS segment_t=0.010
 
 With SLURM via scoop, you need a launch script, something like:
 
+```bash
 ##########################################################
 #!/bin/bash -l
 ##get hostnames for this job:
@@ -40,7 +41,9 @@ HOSTFILE=$(pwd)/hostnames.dat
 ./getHosts.bash $SLURM_JOB_ID > $HOSTFILE
 
 ##build a wrapper for executing python with whatever environment needs to be set
+
 SCOOP_WRAPPER=$(pwd)/scoop-python.sh
+
 cat << EOF > $SCOOP_WRAPPER
 #!/bin/bash -l
 export SLURM_NTASKS=${SLURM_NTASKS}
@@ -52,14 +55,16 @@ exe=../pep.py
 python -m scoop --hostfile $HOSTFILE -n ${SLURM_NTASKS} --python-interpreter $SCOOP_WRAPPER \
            $exe n_replicas=${SLURM_NTASKS} segment_t=0.010 use_sched=SLURM 
 ##########################################################
-
+```
 
 To test the serial part of the code, you might find it useful to execute the nab binary directly:
 
 peptide1  [-l lambda] [-q] [1]  [-boxR Radius] [-kWall wallConstant] [-t time(ns)] [-prStp printstep(ps)] -iniConf file.rst7 -iniTop file -Traj file.trj -Pot file.dat -lseq lambdaSeq.dat -lseqAd lambdaSeqAd.dat -gh ghost.pdb
 
 
-## inputs
+## Inputs
+
+Variables which might need to be changed for different systems are set to standard values in pep.py, then passes as arguments to peptide1.  Some effort was expended in finding a good set of lambda values; boundary conditions (size of the spherical confinement) however is a fairly arbitrary choice.  Work out the effective concentration that you want to simulate at, but beware that at low concentrations there is no acceleration of diffusion-driven sampling, so the code will not perform especially fast.
 
 ### Restraint strength parameter lambda
 
