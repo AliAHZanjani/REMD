@@ -4,40 +4,42 @@
 //definition of variables
 float		m_xyz[dynamic], f_xyz[dynamic], v[dynamic];
 float		fret, dummy[2], test_ene;
-float		abc[3], albega[3], lambda, boxl, kwall, ktotal;
+float		abc[3], albega[3], lambda, dt, min_dt, lambda_freq;
+float       boxl, kwall, ktotal;
 int			i, j, nofstrands, nofatoms, atomofstrand, status;
 int			IsHeavy[dynamic];
 molecule	m1, strandm[dynamic], strand1;
 atom		ai;
 point		mlgeocenter[dynamic], vabc[3], COM, COMV;
-string		stri, pepName;
+string		stri, pepName, optionString;
 string		inputArg[hashed], inLine;
 file		tfout;
 int			outrst_fieldCount;
 int			prsteps, simTime;
 file        rstfout, lseqfout,lseqAdfout, rstfin;
 
-
 //* not sure how to init string constants in nab, so just use sprintf */
 string      usage;
 usage    =    sprintf("%s\n%s\n%s\n\n", "peptide1  [-l lambda] [-q 1]  [-boxR Radius] [-kWall wallConstant]",\
-           "    [-t time(ns)] [-prStp printstep(ps)] -iniConf file.rst7 -iniTop file -Traj file.trj",\
-           "    -outf out.log -Pot file.dat -lseq lambdaSeq.dat -lseqAd lambdaSeqAd.dat -gh ghost.pdb -sy system.pdb");
+           "    [-t time(ns)] [-prStp printstep(ps)] [-dt min_dt_ps] -iniConf file.rst7 -outConf file.rst7 -iniTop file -Traj file.trj",\
+           "    -outf out.log -Pot file.dat -gh ghost.pdb -sy system.pdb");
 
 //===================================================================
 if (argc <= 1){
-    printf ("usage: %s", usage);
+    fprintf (stderr, "require args, usage: %s", usage);
     exit(1);
-}
-else
-    for (i = 1; i < argc; i+=2)
+} else {
+    for (i = 1; i < argc; i+=2) {
         inputArg[argv[i+1]] = argv[i+2];
+    }
+}
 
-if ((!inputArg["-iniConf"] || !inputArg["-iniTop"] || !inputArg["-Traj"] || !inputArg["-Pot"] || !inputArg["-lseq"] || !inputArg["-lseqAd"] || !inputArg["-gh"]) && \
-       argc != 1){
-    printf ("\n\nargc: %i\n Please specify initial configuration and topology files name\n %s \n arg pairs:\n", argc, usage);
-    for (i = 1; i < argc; i+=2)
-        printf("   %s --> %s\n", argv[i+1], argv[i+2]);
+if ((!inputArg["-iniConf"] || !inputArg["-outConf"] || !inputArg["-iniTop"] || \
+     !inputArg["-Traj"]    || !inputArg["-Pot"]     || !inputArg["-gh"]) && argc != 1){
+    fprintf (stderr, "\n\nargc: %i\n Please specify initial configuration and topology files name\n %s \n arg pairs:\n", argc, usage);
+    for (i = 1; i < argc; i+=2){
+        fprintf(stderr, "   %s --> %s\n", argv[i+1], argv[i+2]);
+    }
     exit(1);
 }
 
@@ -46,9 +48,14 @@ if (inputArg["-l"])
 else
     lambda = 0.02;
 
+if (inputArg["-dt"])
+    min_dt = atof(inputArg["-dt"]);
+else
+    min_dt = 0.0005;
+
 if (inputArg["-q"]){
     if ((nabout = fopen("/dev/null","w"))==NULL){
-        printf("having problem setting nabout to null\n");
+        fprintf(stderr, "having problem setting nabout to null\n");
         exit (1);
     }
 }
@@ -56,11 +63,15 @@ if (inputArg["-q"]){
 
 if (inputArg["-sy"]){
     pepName = inputArg["-sy"];
+
     m1      = getpdb(pepName);
+
 }else{
-    printf("Error! Need a template pdb file of the N peptides, argument '-sy filename'\n");
+    fprintf(stderr, "Error! Need a template pdb file of the N peptides, argument '-sy filename'\n");
     exit ( 1 );
 }
+
+
 
 if (inputArg["-boxR"])
     boxl = atof(inputArg["-boxR"]);
@@ -72,25 +83,25 @@ if (inputArg["-kWall"])
 else
     kwall = 0.001;
 
-if (inputArg["-t"])
-    simTime = floor(1000000*atof(inputArg["-t"]));
-else
-    simTime = 100000000;
-
 if (inputArg["-prStp"])
-    prsteps = floor(1000*atof(inputArg["-prStp"]));
+    prsteps = floor(atof(inputArg["-prStp"]) / (min_dt * 1000));
 else
     prsteps = 100;
+
+
+
+if (inputArg["-t"]){
+    //calculate number of steps given input simulation time in notional nanoseconds.
+    simTime = floor( (1000.0 / min_dt) * atof(inputArg["-t"]));
+} else {
+    //simTime = 100000000;
+    simTime = 500; //short default, seeing as this is probably for test.
+}
+
+
+
 //===================================================================
 nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file             
-
-lseqfout   = safe_fopen(inputArg["-lseq"], "a");
-fprintf(lseqfout, "%lf\n", lambda);
-fclose(lseqfout);
-
-lseqAdfout = safe_fopen(inputArg["-lseqAd"], "a"); //adapted lambda sequence
-fprintf(lseqAdfout, "%lf\n", lambda);
-fclose(lseqAdfout);
 
 rseed();
 
@@ -101,14 +112,14 @@ strand1 = getpdb(stri);
 nofstrands   = m1.nstrands;
 nofatoms     = m1.natoms;
 atomofstrand = nofatoms/nofstrands;
-printf("ref system has %i strands of %i atoms each\n", nofstrands, atomofstrand);
+//printf("ref system has %i strands of %i atoms each\n", nofstrands, atomofstrand);
 
 //-------------------------------------------------------------------
 rstfin = safe_fopen(inputArg["-iniConf"], "r");
 inLine = getline( rstfin );
-printf("read header line in input restart:\n''%s''\n", inLine );
+//printf("read header line in input restart:\n''%s''\n", inLine );
 fscanf(rstfin, "%d\n", nofatoms);
-printf("start config has %i atoms, should be %i x %i\n", nofatoms, nofstrands, atomofstrand);
+//printf("start config has %i atoms, should be %i x %i\n", nofatoms, nofstrands, atomofstrand);
 
 allocate m_xyz[3*nofatoms];
 
@@ -130,8 +141,8 @@ for(j=1; j<=nofatoms; j++){
    	if(outrst_fieldCount % 6 == 0){
        	fscanf(rstfin, "\n");
    	}
-    if( j < 3 )
-       printf("atom %i: %lf %lf %lf\n", j, m_xyz[3*j-2], m_xyz[3*j-1], m_xyz[3*j-0]);
+    //if( j < 3 )
+    //   printf("atom %i: %lf %lf %lf\n", j, m_xyz[3*j-2], m_xyz[3*j-1], m_xyz[3*j-0]);
 }
 if(outrst_fieldCount % 6 != 0){
 	fscanf(rstfin, "\n");
@@ -162,7 +173,11 @@ allocate v[3*nofatoms];
 allocate IsHeavy[3*nofatoms]; 
 
 for (ai in m1){
-    if(ai.atomname !~"H" || ai.atomname =~"CH")
+   // if(ai.atomname !~"H" || ai.atomname =~"CH")
+    if ( ai.atomname == "N"  ||\
+         ai.atomname == "CA" ||\
+         ai.atomname == "C"  ||\
+         ai.atomname == "O" )
         IsHeavy[3*ai.tatomnum] = IsHeavy[3*ai.tatomnum-1] = IsHeavy[3*ai.tatomnum-2]=1;
     else
         IsHeavy[3*ai.tatomnum] = IsHeavy[3*ai.tatomnum-1] = IsHeavy[3*ai.tatomnum-2]=0;
@@ -172,25 +187,49 @@ setxyz_from_mol(m1,NULL,m_xyz);
 status = init_mymme(m_xyz, strand1, nofstrands, nofatoms, atomofstrand, lambda, boxl, kwall, IsHeavy, prsteps, \
                        inputArg["-Traj"], inputArg["-Pot"] );
 
-mm_options("gb=5, gbsa=1, ntpr=1000, ntpr_md=1000, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
+//determine a safe timestep based on restraint strength
 
-//mm_options("gb=8, gbsa=1, ntpr=1, ntpr_md=1, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
+//nab outputs the gradient of the potential: kcal/mol/A.
+//multiply by AMBER_FRC_TO_SI to convert to Newtons (kg m s^-2)
+//a spring constant has units: kcal/mol/A^2.
+//#define AMBER_FRC_TO_SI     (6.94769535e-11)
+//convert spring constant from kcalml/A^2 to N / m
+//#define AMBER_SPRINGK_TO_SI (0.694769535)
+//angular frequency is sqrt(k / reduced mass, use carbon mass)
+if(  lambda > 0. ){
+    lambda_freq  = sqrt( 0.695 * lambda / 2e-26);
+    dt           = 1e12 * 0.1 * 2 * 3.14159 / lambda_freq;
+}else if( lambda < 0. ) {
+    lambda_freq  = sqrt(-0.695 * lambda / 2e-26);
+    dt           = 1e12 * 0.1 * 2 * 3.14159 / lambda_freq;
+}else{
+    dt           = 999.9;
+}
+if ( dt > min_dt ){
+    dt = min_dt;  //use a 1 or 2 fs timestep if the restraints don't demand something smaller.
+}
+
+//Ali defaults: mm_options("gb=8, gbsa=1, ntpr=1, ntpr_md=1, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
+optionString = sprintf("gb=5, gbsa=1, ntpr=1000, ntpr_md=1000, dt=%.8f, rattle=2, gamma_ln=0.1, tempi=300, temp0=300",\
+                          dt);
+mm_options(optionString);
+
 mme_init(m1, NULL,"::ZZZ", dummy, NULL);
 
-///try a single-point energy evaluation, just to validate the inputs.
-test_ene = mme(m_xyz, f_xyz, 1);
-printf("Basic test of input structure, ene is: %e\n", test_ene);
-test_ene =my_mme(m_xyz, f_xyz, 1);
-printf("Subject to restraints, test ene is: %e\n", test_ene);
+//////DEBUG: try a single-point energy evaluation, just to validate the inputs.
+//test_ene = mme(m_xyz, f_xyz, 1);
+//printf("Basic test of input structure, ene is: %e\n", test_ene);
+//test_ene = my_mme(m_xyz, f_xyz, 1);
+//printf("Subject to restraints, test ene is: %e\n",    test_ene);
 
-  
+///run some MD using the modified molecular mechanics, with extra restraints.
 md(3*nofatoms, simTime, m_xyz, f_xyz, v, my_mme);      
 
-rstfout = safe_fopen(inputArg["-iniConf"], "w");
+rstfout = safe_fopen(inputArg["-outConf"], "w");
 
 outrst_fieldCount = 0;
 
-fprintf(rstfout, "remd restart\n%d\n", nofatoms);
+fprintf(rstfout, "restart l=%.6f\n%d\n", lambda, nofatoms);
 
 for(j=1; j<=nofatoms; j++){
 			fprintf(rstfout, "%12.7lf", m_xyz[3*j-2]);
