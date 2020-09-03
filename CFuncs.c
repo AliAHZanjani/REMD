@@ -85,6 +85,7 @@ REAL_T my_mme(REAL_T x[], REAL_T f[], INT_T *iter){
     epGhostP = 0.0;
     epGhost1 = 0.0;
     
+    //add quadratic "ghost" restraints
     for (i = 0; i < 3*global_natom; i++){
         if(global_IsHeavy[i]){
             df           =  globalgh_xyz[i]-x[i];
@@ -108,10 +109,18 @@ REAL_T my_mme(REAL_T x[], REAL_T f[], INT_T *iter){
             f[i+2]  -=  df*x[i+2]*invr;
             epGhost +=  0.5*global_kwall*(r-global_boxl)*(r-global_boxl);
         }
+
     }
 //=====================================
     if (counter % outStep == 1){
 	fprintf( potfout, "%-7d\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\n",counter, epG0, epGhost1, epGhost-epGhost1, epGhost, epTot, epTot+epGhost );
+
+    }        
+    gEPOT   = epTot;
+    gEGHOST = epG0;
+    gEWALL  = epGhost-epGhost1;        
+    
+=======
         
         gEPOT   = epTot;
         gEGHOST = epG0;
