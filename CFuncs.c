@@ -60,40 +60,56 @@ INT_T init_mymme( REAL_T mo_xyz[], MOLECULE_T * *strandmol, INT_T *nPeps, INT_T 
     global_boxl   = *boxle;
     global_kwall  = *kwa;
 //global_previousEpGhost = INIT_EPGHOST;
-	counter=0;ccccc=0;
+    counter=0;ccccc=0;
     potfout = safe_fopen( *Poten, "a" );
-	fprintf( potfout, "counter\t	eGhost/lambda\t    eGhost\t    eWall\t     eW+eGh\t    ePot\t      ePotTotal\n");
-	tfout = safe_fopen( *OutTraj,"a" );
+    fprintf( potfout, "counter\t	eGhost/lambda\t    eGhost\t    eWall\t     eW+eGh\t    ePot\t      ePotTotal\n");
+
+    //open output trajectory for the first time or to append.
+    tfout = fopen(*OutTraj, "r");
+    if( !tfout ){
+          tfout = safe_fopen( *OutTraj,"a" );
+          fprintf(tfout, "Run: l=%.8f\n", global_lambda);
+    }else{
+          fclose(tfout);
+          tfout = safe_fopen( *OutTraj,"a" );
+    }
+    
+
+
     outcrd_fieldCount = 0;
     return( i );
 };
 //-------------------------------------------------------------------
 REAL_T my_mme(REAL_T x[], REAL_T f[], INT_T *iter){
     INT_T	i,j;
-	REAL_T	epTot, epGhost, epGhostP, delE, epGhost1, epG0, df, dfP, r2, r, invr, neglog;
+    REAL_T	epTot, epGhost, epGhostP, delE, epGhost1, epG0, df, dfP, r2, r, invr, neglog;
 //-------------------------------------------------------------------
-	counter++;
-	epTot = mme(x, f, iter);
-    for (i = 0; i < 3*global_natom; i++){
-        globalfP[i] = f[i];
-        }
+//
+    counter++;
+    epTot = mme(x, f, iter);
+
+    memcpy( (void *)globalfP, f, 3*global_natom*sizeof(REAL_T) );
+    
     gtNewGhost( x,  &global_nstr,  &global_nsatom, &global_strand, globalstrand_xyz,  &global_temp, globaltemp_xyz, global_newGhxyz, globalgh_xyz);
-    epG0	 = 0.0;
-	epGhost  = 0.0;
-	epGhostP = 0.0;
+  
+    epG0     = 0.0;
+    epGhost  = 0.0;
+    epGhostP = 0.0;
     epGhost1 = 0.0;
-	for (i = 0; i < 3*global_natom; i++){
+    
+    //add quadratic "ghost" restraints
+    for (i = 0; i < 3*global_natom; i++){
         if(global_IsHeavy[i]){
-    		df           =  globalgh_xyz[i]-x[i];
+            df           =  globalgh_xyz[i]-x[i];
             f[i]        -=  df * global_lambda;
             epGhost     +=  df * df;
         }
     }
-	epG0	 = 0.5 * epGhost;
+    epG0     = 0.5 * epGhost;
     epGhost *= 0.5 * global_lambda;
     epGhost1 = epGhost;  
 //=====================================Spherical restraining potential
-	for (i = 0; i < 3*global_natom; i += 3){
+    for (i = 0; i < 3*global_natom; i += 3){
 		r2 = x[i]*x[i] + x[i+1]*x[i+1] + x[i+2]*x[i+2];
         
         if (r2>(global_boxl*global_boxl)){
@@ -105,10 +121,18 @@ REAL_T my_mme(REAL_T x[], REAL_T f[], INT_T *iter){
             f[i+2]  -=  df*x[i+2]*invr;
             epGhost +=  0.5*global_kwall*(r-global_boxl)*(r-global_boxl);
         }
+
     }
 //=====================================
-	if (counter % outStep == 1){
-		fprintf( potfout, "%-7d\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\n",counter, epG0, epGhost1, epGhost-epGhost1, epGhost, epTot, epTot+epGhost );
+    if (counter % outStep == 1){
+	fprintf( potfout, "%-7d\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\n",counter, epG0, epGhost1, epGhost-epGhost1, epGhost, epTot, epTot+epGhost );
+
+    }        
+    gEPOT   = epTot;
+    gEGHOST = epG0;
+    gEWALL  = epGhost-epGhost1;        
+    
+=======
         
         gEPOT   = epTot;
         gEGHOST = epG0;
