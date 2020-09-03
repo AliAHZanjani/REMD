@@ -18,10 +18,13 @@ int			outrst_fieldCount;
 int			prsteps, simTime;
 file        rstfout, lseqfout,lseqAdfout, rstfin;
 
+float       Tscale;
+
+
 //* not sure how to init string constants in nab, so just use sprintf */
 string      usage;
 usage    =    sprintf("%s\n%s\n%s\n\n", "peptide1  [-l lambda] [-q 1]  [-boxR Radius] [-kWall wallConstant]",\
-           "    [-t time(ns)] [-prStp printstep(ps)] [-dt min_dt_ps] -iniConf file.rst7 -outConf file.rst7 -iniTop file -Traj file.trj",\
+           "    [-t time(ns)] [-prStp printstep(ps)] [-dt min_dt_ps] [-T Tscale] -iniConf file.rst7 -outConf file.rst7 -iniTop file -Traj file.trj",\
            "    -outf out.log -Pot file.dat -gh ghost.pdb -sy system.pdb");
 
 //===================================================================
@@ -36,6 +39,7 @@ if (argc <= 1){
 
 if ((!inputArg["-iniConf"] || !inputArg["-outConf"] || !inputArg["-iniTop"] || \
      !inputArg["-Traj"]    || !inputArg["-Pot"]     || !inputArg["-gh"]) && argc != 1){
+
     fprintf (stderr, "\n\nargc: %i\n Please specify initial configuration and topology files name\n %s \n arg pairs:\n", argc, usage);
     for (i = 1; i < argc; i+=2){
         fprintf(stderr, "   %s --> %s\n", argv[i+1], argv[i+2]);
@@ -47,6 +51,13 @@ if (inputArg["-l"])
     lambda = atof(inputArg["-l"]);
 else
     lambda = 0.02;
+
+if (inputArg["-T"])
+    Tscale = atof(inputArg["-T"]);
+else
+    Tscale = 1.0;
+if( Tscale >= 290 )
+   fprintf(stderr, "Warning! Tscale >= 290. Use Tscale = 1.0 to get temperature = 300K!\n");
 
 if (inputArg["-dt"])
     min_dt = atof(inputArg["-dt"]);
@@ -101,7 +112,7 @@ if (inputArg["-t"]){
 
 
 //===================================================================
-nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file             
+nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file       
 
 rseed();
 
@@ -210,8 +221,10 @@ if ( dt > min_dt ){
 }
 
 //Ali defaults: mm_options("gb=8, gbsa=1, ntpr=1, ntpr_md=1, dt=0.0005, gamma_ln=0.1, tempi=300, temp0=300, nscm=10000000");
-optionString = sprintf("gb=5, gbsa=1, ntpr=1000, ntpr_md=1000, dt=%.8f, rattle=2, gamma_ln=0.1, tempi=300, temp0=300",\
-                          dt);
+
+optionString = sprintf("gb=5, gbsa=1, ntpr=1000, ntpr_md=1000, dt=%.8f, rattle=2, gamma_ln=0.1, tempi=%.1f, temp0=%.1f",\
+                          dt, 300.0*Tscale, 300.0*Tscale);
+
 mm_options(optionString);
 
 mme_init(m1, NULL,"::ZZZ", dummy, NULL);

@@ -92,7 +92,51 @@ else:
 ##(positive part of) this list of reaction coordinates was the product of some optimisation by Ali.
 lambdas = np.array([ -0.000290, -0.000202, -0.000129, -0.000073, -0.000032, -0.000008,
 0.000000, 0.000008, 0.000032, 0.000073, 0.000129, 0.000202, 0.000290, 0.000395, 0.000516, 0.000653, 0.000806, 0.000976, 0.001161, 0.001363, 0.001580, 0.001814, 0.002064, 0.002330, 0.002612, 0.002911, 0.003225, 0.003556, 0.003902, 0.004265, 0.004644, 0.005039, 0.005450, 0.005878, 0.006321, 0.006781, 0.007256, 0.007748, 0.008256, 0.008780, 0.009320, 0.009877, 0.010449, 0.011038, 0.011642, 0.012263, 0.012900, 0.013553, 0.014222, 0.014908, 0.015609, 0.016327, 0.017060, 0.017810, 0.018576, 0.019358, 0.020156, 0.020971, 0.021801, 0.022648, 0.023510, 0.024389, 0.025284, 0.026195, 0.027122, 0.028066, 0.029025, 0.030001, 0.030992, 0.032000])
+
 lambdas = lambdas[:n_replicas]
+
+##experimental: try some T-remd with H-remd.
+Tscales = np.ones_like(lambdas)
+Tscales[0] = 1.16
+Tscales[1] = 1.15
+Tscales[2] = 1.14
+Tscales[3] = 1.12
+Tscales[4] = 1.10
+Tscales[5] = 1.05
+
+print("testing environment")
+nodelist = []
+if use_sched == "OAR":
+   try:
+       nodeList = subprocess.check_output(['cat $OAR_NODEFILE'],shell=True)
+       nlist    = nodeList.decode()
+       nlist    = nlist.split('\n')
+
+       if len(nlist)-1 != n_replicas:
+           print("warning! replicas doesn't match number of nodes.")  
+       text_file = open("Out0put.txt", "w")
+       for i in range(len(nlist)-1):
+           text_file.write("nodelist[%d] = %s \n" %(i,nlist[i]))
+       text_file.close()
+       
+   except Exception as e:
+       nodeList = []
+       print("did not get OAR nodelist: "+str(e))
+elif use_sched == "SLURM":
+   ##no code needed here.
+   #print("using SLURM scheduler")
+   if haveScoop is False:
+       print("Can't run on slurm without scoop task manager.")
+       exit(1)
+else:
+   print("using no scheduler, just forking jobs.")
+   
+
+##(positive part of) this list of reaction coordinates was the product of some optimisation by Ali.
+lambdas = np.array([ -0.000290, -0.000202, -0.000129, -0.000073, -0.000032, -0.000008,
+0.000000, 0.000008, 0.000032, 0.000073, 0.000129, 0.000202, 0.000290, 0.000395, 0.000516, 0.000653, 0.000806, 0.000976, 0.001161, 0.001363, 0.001580, 0.001814, 0.002064, 0.002330, 0.002612, 0.002911, 0.003225, 0.003556, 0.003902, 0.004265, 0.004644, 0.005039, 0.005450, 0.005878, 0.006321, 0.006781, 0.007256, 0.007748, 0.008256, 0.008780, 0.009320, 0.009877, 0.010449, 0.011038, 0.011642, 0.012263, 0.012900, 0.013553, 0.014222, 0.014908, 0.015609, 0.016327, 0.017060, 0.017810, 0.018576, 0.019358, 0.020156, 0.020971, 0.021801, 0.022648, 0.023510, 0.024389, 0.025284, 0.026195, 0.027122, 0.028066, 0.029025, 0.030001, 0.030992, 0.032000])
+lambdas = lambdas[:n_replicas]
+>>>>>>> cbdd19894f6c77f14ceaae3b043dd1b2a0af004f
 
 
 #===============================================================================
@@ -104,6 +148,7 @@ def rep( in_tup ) :
     swap_index = in_tup[1]
 
     re_lambda   = "%f" % lambdas[my_index]
+    re_tscale   = "%f" % Tscales[my_index]
 
     exe       = PathDir+"../peptide1"
     initop    = PathDir+"Peptides.top"
@@ -124,7 +169,8 @@ def rep( in_tup ) :
                "-iniTop", initop, "-q", "1",\
                "-Traj", traj, "-Pot", pot, "-t", segment_t, "-l", re_lambda, \
                "-sy",  template, "-dt", "%.8f" % min_dt_ps, \
-               "-outf", outfile, "-gh", ghost]
+               "-outf", outfile, "-gh", ghost, "-T", re_tscale]
+
 
     try:
          arg = subprocess.check_output( [" ".join(argSet)], shell=True   )
@@ -195,8 +241,11 @@ if __name__ == "__main__":
 
     ##by default each run starts from its own restart.
     inp_indices  = np.arange((len(swapSet)))
+    ##see $AMBERHOME/lib/constants.f90
+    amber_kB  = 0.001987215873 
+    amber_kBT = 300 * amber_kB
 
-    for count in range(25) :
+    for count in range(10) :
 
         y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices) ))
 
@@ -221,20 +270,30 @@ if __name__ == "__main__":
             i = pair_seq[ii,0]
             j = pair_seq[ii,1]
 
-            ##if we do the swap
-            delta = lambdas[i]*(ePot[j,1] - ePot[i,1]) + lambdas[j]*(ePot[i,1] - ePot[j,1])
+            ibetai = amber_kBT * Tscales[i]
+            ibetaj = amber_kBT * Tscales[j]
+
+            betai = 1./ ibetai
+            betaj = 1./ ibetaj
+
+            ##if we do the swap, there is a change in the restraint energy
+            delta = (lambdas[i]*ePot[j,1]+ePot[j,0]+ePot[j,2])*betai - (lambdas[i]*ePot[i,1]+ePot[i,0]+ePot[i,2])*betai +\
+                    (lambdas[j]*ePot[i,1]+ePot[i,0]+ePot[i,2])*betaj - (lambdas[j]*ePot[j,1]+ePot[j,0]+ePot[j,2])*betaj
+
             if delta <= 0. or neglogflips[ii] > delta:
                 swapSet[i], swapSet[j] = swapSet[j], swapSet[i]
                 ePot[i,1],   ePot[j,1] = ePot[j,1],   ePot[i,1]
+                ePot[i,0],   ePot[j,0] = ePot[j,0],   ePot[i,0]
+                ePot[i,2],   ePot[j,2] = ePot[j,2],   ePot[i,2]
                 inp_indices[i], inp_indices[j] = inp_indices[j], inp_indices[i]
 
-            ###need something like an atomic write of the swap info: if it gets corrupted we 
-            ###have some major hassle.
-            swapLog = open( PathDir+"/swap_record.dat", "a" )
-            for s in swapSet:
-                swapLog.write("%i " % s)
-            swapLog.write("\n") 
-            swapLog.close()
+        ###need something like an atomic write of the swap info: if it gets corrupted we 
+        ###have some major hassle.
+        swapLog = open( PathDir+"/swap_record.dat", "a" )
+        for s in swapSet:
+             swapLog.write("%i " % s)
+        swapLog.write("\n") 
+        swapLog.close()
 ###########################END of file.
 
 
