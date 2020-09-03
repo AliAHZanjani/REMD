@@ -1,8 +1,8 @@
 //NAB FUNCTIONS
 #include "NabFuncs.h"
 
-int getNewConf(float  oldGh_xyz[0],     /* input coordinates of old ghost */
-               float    newGh_xyz[0],   /* output of getNewConf, new ghost coordinates written into this */
+int getNewConf(float  oldGh_xyz[0],   /* input coordinates of old ghost */
+               float  newGh_xyz[0],   /* output of getNewConf, new ghost coordinates written into this */
                molecule strand, string strn, string atomGroup){        /* molecule information for one strand */
 
     int			j,n;
@@ -76,37 +76,43 @@ int getNewConf(float  oldGh_xyz[0],     /* input coordinates of old ghost */
 };
 
 int gtNewGhost(float molc_xyz[0], int nPeps, int atmsPerPep, molecule strand, float strand_xyz[0], molecule temp, float temp_xyz[0], float singleGh_xyz[0], float ghost_xyz[0]){
-    int     i1, j1;
+    int     i1, j1, okFlag;
     atom    ai;
     string  str;
     point   p1, p2, pN, pC, pM, vNC, rotationAxis;
     matrix  mat1;
     float   rotAng;
+
     for (j1 = 1; j1 <= 3*atmsPerPep; j1++)
         temp_xyz[j1] = singleGh_xyz[j1];
     setmol_from_xyz(temp, NULL, temp_xyz);         
+
     /* loop over n peptides */
     for (i1 = 1; i1 <= nPeps; i1++){
+
         /* expensive, pointless, copy of coordinates for this peptide into a workspace */
         for (j1 = 1; j1 <= 3*atmsPerPep; j1++){
             strand_xyz[j1] = molc_xyz[3*(i1-1)*atmsPerPep+j1];
         }
         setmol_from_xyz(strand, NULL, strand_xyz);   
-		superimpose(temp,"::C,CA,CB,N,O",strand,"::C,CA,CB,N,O");
 
+        //align to atoms : must match the mask "isHeavy"
+		superimpose(temp,"::C,CA,N,O",strand,"::C,CA,N,O");
+
+        //end-to-end strand vector, try to find this in a non-sysdep way.
+        okFlag = 0;
         for (ai in temp){
-            if (ai.fullname == "1:1:N"){
-                pN = ai.pos;
-            }
-            else{
-                if (ai.fullname == "1:6:C"){
-                    pC = ai.pos;
-                }
+            if (ai.atomname == "N" && okFlag == 0){
+                pN     = ai.pos;
+                okFlag = okFlag + 1;
+            }else if (ai.atomname == "C"){
+                pC = ai.pos;
             }
         }
-        pM  = 0.5*(pN+pC);
-        vNC = pC-pN;
-        rotAng = -atan(vNC.y/sqrt((vNC.x*vNC.x)+(vNC.z*vNC.z)));
+
+        pM     =  0.5*(pN+pC);
+        vNC    =  pC-pN;
+        rotAng = -atan( vNC.y / sqrt((vNC.x*vNC.x)+(vNC.z*vNC.z)) );
         //project vNC into the x-z plane and then rotate +90 degrees.
         rotationAxis.x = -vNC.z;
         rotationAxis.y =    0.0;
