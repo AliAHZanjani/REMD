@@ -126,18 +126,11 @@ REAL_T my_mme(REAL_T x[], REAL_T f[], INT_T *iter){
 //=====================================
     if (counter % outStep == 1){
 	fprintf( potfout, "%-7d\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\t%12.7f\n",counter, epG0, epGhost1, epGhost-epGhost1, epGhost, epTot, epTot+epGhost );
-
     }        
     gEPOT   = epTot;
     gEGHOST = epG0;
     gEWALL  = epGhost-epGhost1;        
-    
-=======
         
-        gEPOT   = epTot;
-        gEGHOST = epG0;
-        gEWALL  = epGhost-epGhost1;        
-    }
     if (counter % (10*outStep) == 1){
         for( j = 1;j <= global_natom;j ++  ){
             fprintf( tfout, "%8.3lf", x[3 * j - 2 - 1] );
