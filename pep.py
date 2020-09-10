@@ -104,6 +104,8 @@ Tscales[3] = 1.12
 Tscales[4] = 1.10
 Tscales[5] = 1.05
 
+Tscales[n_replicas-17:n_replicas] += np.arange(17)*0.01
+
 print("testing environment")
 nodelist = []
 if use_sched == "OAR":
@@ -140,6 +142,7 @@ def rep( in_tup ) :
     ##print("in rep: ", my_index)
     my_index   = in_tup[0]
     swap_index = in_tup[1]
+    seed       = in_tup[2]
 
     re_lambda   = "%f" % lambdas[my_index]
     re_tscale   = "%f" % Tscales[my_index]
@@ -163,7 +166,7 @@ def rep( in_tup ) :
                "-iniTop", initop, "-q", "1",\
                "-Traj", traj, "-Pot", pot, "-t", segment_t, "-l", re_lambda, \
                "-sy",  template, "-dt", "%.8f" % min_dt_ps, \
-               "-outf", outfile, "-gh", ghost, "-T", re_tscale]
+               "-outf", outfile, "-gh", ghost, "-T", re_tscale, "-S", "%i" % seed]
 
 
     try:
@@ -241,7 +244,8 @@ if __name__ == "__main__":
 
     for count in range(10) :
 
-        y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices) ))
+        seeds      = np.random.randint( np.shape(rep_indices)  )
+        y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices, seeds) ))
 
         #####do the replica exchange
         ePot       = np.asarray(y_parallel)  

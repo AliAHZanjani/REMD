@@ -14,8 +14,8 @@ point		mlgeocenter[dynamic], vabc[3], COM, COMV;
 string		stri, pepName, optionString;
 string		inputArg[hashed], inLine;
 file		tfout;
-int			outrst_fieldCount;
-int			prsteps, simTime;
+int	        seed, outrst_fieldCount;
+int		prsteps, simTime;
 file        rstfout, lseqfout,lseqAdfout, rstfin;
 
 float       Tscale;
@@ -25,7 +25,7 @@ float       Tscale;
 string      usage;
 usage    =    sprintf("%s\n%s\n%s\n\n", "peptide1  [-l lambda] [-q 1]  [-boxR Radius] [-kWall wallConstant]",\
            "    [-t time(ns)] [-prStp printstep(ps)] [-dt min_dt_ps] [-T Tscale] -iniConf file.rst7 -outConf file.rst7 -iniTop file -Traj file.trj",\
-           "    -outf out.log -Pot file.dat -gh ghost.pdb -sy system.pdb");
+           "    -outf out.log -Pot file.dat -gh ghost.pdb -sy system.pdb -S seed");
 
 //===================================================================
 if (argc <= 1){
@@ -52,6 +52,11 @@ if (inputArg["-l"])
 else
     lambda = 0.02;
 
+if (inputArg["-S"])
+    seed = atoi(inputArg["-S"]);
+else
+    seed = 0;
+
 if (inputArg["-T"])
     Tscale = atof(inputArg["-T"]);
 else
@@ -74,9 +79,7 @@ if (inputArg["-q"]){
 
 if (inputArg["-sy"]){
     pepName = inputArg["-sy"];
-
     m1      = getpdb(pepName);
-
 }else{
     fprintf(stderr, "Error! Need a template pdb file of the N peptides, argument '-sy filename'\n");
     exit ( 1 );
@@ -114,7 +117,10 @@ if (inputArg["-t"]){
 //===================================================================
 nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file       
 
-rseed();
+if( seed != 0 )
+    setseed( -seed );
+else
+    rseed( );
 
 stri    = inputArg["-gh"];
 strand1 = getpdb(stri);
