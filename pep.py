@@ -245,6 +245,13 @@ if __name__ == "__main__":
     for count in range(10) :
 
         seeds      = np.random.randint( np.shape(rep_indices)  )
+        swapLog = open( PathDir+"/swap_record.dat", "a" )
+        swapLog.write("# ")
+        for s in seeds:
+             swapLog.write("%i " % s)
+        swapLog.write("\n")
+        swapLog.close()
+
         y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices, seeds) ))
 
         #####do the replica exchange
