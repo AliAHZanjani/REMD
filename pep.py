@@ -240,7 +240,7 @@ if __name__ == "__main__":
 #########################################################################
 ## MAIN LOOP
 #########################################################################
-    if pref_runf is not None: 
+    if prev_runf is not None: 
         for line in prev_runf:
                if line[0] == "#" : continue 
                useL = line
