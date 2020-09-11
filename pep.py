@@ -240,21 +240,22 @@ if __name__ == "__main__":
 #########################################################################
 ## MAIN LOOP
 #########################################################################
+    useL = None
     if prev_runf is not None: 
         for line in prev_runf:
-               if line[0] == "#" : continue 
-               useL = line
-        L = useL.split()
-        swapSet = np.zeros((len(L)))
-        for i in range(len(L)):
-           swapSet[i] = int(L[i])
-    else:
+            if line[0] == "#" : continue 
+            useL = line
+        if useL is not None:
+            L = useL.split()
+            swapSet = np.zeros((len(L)))
+            for i in range(len(L)):
+                swapSet[i] = int(L[i])
+    if useL is None:
         swapSet = np.arange(n_replicas)
         this_runf.write("# ")
         for s in swapSet:
            this_runf.write("%.6f " % lambdas[s])
         this_runf.write("\n")
-        this_runf.close()
 
     ##by default each run starts from its own restart.
     inp_indices  = np.arange((len(swapSet)))
@@ -264,7 +265,7 @@ if __name__ == "__main__":
 
     for count in range(10) :
 
-        seeds      = np.random.randint( 2**24, np.shape(rep_indices)  )
+        seeds      = np.random.randint( 0, 2**24, np.shape(rep_indices)  )
         y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices, seeds) ))
 
         #####do the replica exchange
@@ -316,7 +317,6 @@ if __name__ == "__main__":
         for s in swapSet:
             this_runf.write("%i " % s)
         this_runf.write("\n") 
-        this_runf.close()
         
     ##backup the trajectories, restarts etc.
     for my_index in range(n_replicas) :
@@ -330,9 +330,9 @@ if __name__ == "__main__":
         p2      = PathDir+"Replica%d/potentiel_%04i.dat"   % (my_index, this_runid)
 
         shutil.copy2(restart, r2)
-        shutil.copy2(traj,    t2)
-        shutil.copy2(log,     l2)
-        shutil.copy2(pot,     p2)
+        shutil.move(traj,     t2)
+        shutil.move(log,      l2)
+        shutil.move(pot,      p2)
 
 ###########################END of file.
 
