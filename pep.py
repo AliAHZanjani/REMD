@@ -151,11 +151,14 @@ def rep( in_tup ) :
     initop    = PathDir+"Peptides.top"
     ghost     = PathDir+"ghost.pdb"                 
     template  = PathDir+"template.pdb"                 
-    ini_rst   = PathDir+"Replica%d/Peptides.rst7"   % swap_index
-    out_rst   = PathDir+"Replica%d/Peptides.rst7"   % my_index
-    traj      = PathDir+"Replica%d/trajectory.traj" % my_index
-    pot       = PathDir+"Replica%d/potentiel.dat"   % my_index
-    outfile   = PathDir+"Replica%d/nabMD.dat"       % my_index
+
+    ##use restarts in-place while inside the subloop, then back them up 
+    ##at the end of a run.
+    ini_rst   = PathDir+"Replica%d/Peptides.rst7"   % (swap_index)
+    out_rst   = PathDir+"Replica%d/Peptides.rst7"   % (my_index)
+    traj      = PathDir+"Replica%d/trajectory.traj" % (my_index)
+    pot       = PathDir+"Replica%d/potentiel.dat"   % (my_index)
+    outfile   = PathDir+"Replica%d/nabMD.dat"       % (my_index)
 
 
     ##############################################3
@@ -193,6 +196,23 @@ def rep( in_tup ) :
 ##serial below this point: above code is thread-global initialisation
 if __name__ == "__main__":
 
+    import glob
+
+    run_records = glob.glob("run_record_*.dat")
+    run_ids     = []
+    for r in run_records:
+        rid = r.split("_")[-1]
+        rid = int(rid[:4])
+        run_ids.append(rid)
+    if len(run_ids) >= 1:
+        rmax = np.max(run_ids)
+        prev_runf  = open("run_record_%04i.dat" % rmax, "r")
+    else:
+        rmax = 0
+        prev_runf  = None
+    this_runid = rmax + 1
+    this_runf  = open("run_record_%04i.dat" % this_runid, "w")
+
     for l in lambdas:
        est_dt = 0.002
        if l > 0.:
@@ -219,22 +239,21 @@ if __name__ == "__main__":
 #########################################################################
 ## MAIN LOOP
 #########################################################################
-    try:
-        with open( PathDir+"/swap_record.dat", "r" ) as swapLog:
-            for line in swapLog: 
-               pass
-        L = line.split()
+    if pref_runf is not None: 
+        for line in prev_runf:
+               if line[0] == "#" : continue 
+               useL = line
+        L = useL.split()
         swapSet = np.zeros((len(L)))
         for i in range(len(L)):
            swapSet[i] = int(L[i])
-    except:
+    else:
         swapSet = np.arange(n_replicas)
-        swapLog = open( PathDir+"/swap_record.dat", "w" )
-        swapLog.write("# ")
+        this_runf.write("# ")
         for s in swapSet:
-           swapLog.write("%.6f " % lambdas[s])
-        swapLog.write("\n")
-        swapLog.close()
+           this_runf.write("%.6f " % lambdas[s])
+        this_runf.write("\n")
+        this_runf.close()
 
     ##by default each run starts from its own restart.
     inp_indices  = np.arange((len(swapSet)))
@@ -244,14 +263,7 @@ if __name__ == "__main__":
 
     for count in range(10) :
 
-        seeds      = np.random.randint( np.shape(rep_indices)  )
-        swapLog = open( PathDir+"/swap_record.dat", "a" )
-        swapLog.write("# ")
-        for s in seeds:
-             swapLog.write("%i " % s)
-        swapLog.write("\n")
-        swapLog.close()
-
+        seeds      = np.random.randint( 2**24, np.shape(rep_indices)  )
         y_parallel = list(futures.map( rep,  zip(rep_indices, inp_indices, seeds) ))
 
         #####do the replica exchange
@@ -294,11 +306,33 @@ if __name__ == "__main__":
 
         ###need something like an atomic write of the swap info: if it gets corrupted we 
         ###have some major hassle.
-        swapLog = open( PathDir+"/swap_record.dat", "a" )
+
+        this_runf.write("# ")
+        for s in seeds:
+             this_runf.write("%i " % s)
+        this_runf.write("\n")
+
         for s in swapSet:
-             swapLog.write("%i " % s)
-        swapLog.write("\n") 
-        swapLog.close()
+            this_runf.write("%i " % s)
+        this_runf.write("\n") 
+        this_runf.close()
+        
+    ##backup the trajectories, restarts etc.
+    for my_index in range(n_replicas) :
+        restart = PathDir+"Replica%d/Peptides.rst7"        %  my_index
+        r2      = PathDir+"Replica%d/Peptides_%04i.rst7"   % (my_index, this_runid)
+        traj    = PathDir+"Replica%d/trajectory.traj"      %  my_index
+        t2      = PathDir+"Replica%d/trajectory_%04i.traj" % (my_index, this_runid)
+        log     = PathDir+"Replica%d/nabMD.dat"            %  my_index
+        l2      = PathDir+"Replica%d/nabMD.dat"            % (my_index, this_runid)
+        pot     = PathDir+"Replica%d/potentiel.dat"        %  my_index
+        p2      = PathDir+"Replica%d/potentiel_%04i.dat"   % (my_index, this_runid)
+
+        shutil.copy2(restart, r2)
+        shutil.copy2(traj,    t2)
+        shutil.copy2(log,     l2)
+        shutil.copy2(pot,     p2)
+
 ###########################END of file.
 
 
