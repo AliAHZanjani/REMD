@@ -117,10 +117,13 @@ if (inputArg["-t"]){
 //===================================================================
 nabout     = safe_fopen(inputArg["-outf"], "a"); //NAB output file       
 
-if( seed != 0 )
+if( seed != 0 ){
     setseed( -seed );
-else
-    rseed( );
+} else {
+    seed = -1 * rseed( );
+}
+//printf("To repeat run, pass seed: %i\n", seed);
+
 
 stri    = inputArg["-gh"];
 strand1 = getpdb(stri);
