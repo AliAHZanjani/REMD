@@ -325,7 +325,7 @@ if __name__ == "__main__":
         traj    = PathDir+"Replica%d/trajectory.traj"      %  my_index
         t2      = PathDir+"Replica%d/trajectory_%04i.traj" % (my_index, this_runid)
         log     = PathDir+"Replica%d/nabMD.dat"            %  my_index
-        l2      = PathDir+"Replica%d/nabMD.dat"            % (my_index, this_runid)
+        l2      = PathDir+"Replica%d/nabMD_%04i.dat"       % (my_index, this_runid)
         pot     = PathDir+"Replica%d/potentiel.dat"        %  my_index
         p2      = PathDir+"Replica%d/potentiel_%04i.dat"   % (my_index, this_runid)
 
