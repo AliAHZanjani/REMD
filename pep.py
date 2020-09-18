@@ -104,8 +104,8 @@ Tscales[3] = 1.12
 Tscales[4] = 1.10
 Tscales[5] = 1.05
 
-if n_replicas >= 17:
-    Tscales[n_replicas-17:n_replicas] += np.arange(17)*0.01
+if n_replicas >= 50:
+    Tscales[n_replicas-50:n_replicas] += np.arange(50)*0.001
 
 print("testing environment")
 nodelist = []
